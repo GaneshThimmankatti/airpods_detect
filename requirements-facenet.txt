@@ -1,0 +1,7 @@
+# Optional, but strongly recommended: a real face-identity embedding model.
+# Without this the project falls back to Apple's generic image feature print,
+# which is far less reliable at telling one person from another.
+torch>=2.2
+torchvision>=0.17
+facenet-pytorch>=2.6
+pillow>=10.0

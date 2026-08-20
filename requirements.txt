@@ -1,0 +1,6 @@
+numpy>=1.26
+opencv-python>=4.9
+pyobjc-framework-Cocoa>=10.1
+pyobjc-framework-Quartz>=10.1
+pyobjc-framework-Vision>=10.1
+pyobjc-framework-IOBluetooth>=10.1

@@ -1,0 +1,25 @@
+{
+  "bluetooth": {
+    "device_name_contains": "AirPods Pro",
+    "poll_seconds": 3,
+    "stop_detector_on_disconnect": true
+  },
+  "detector": {
+    "camera_index": 0,
+    "consecutive_frames": 10,
+    "match_threshold": null,
+    "cooldown_seconds": 60,
+    "show_window": true,
+    "mirror": true,
+    "min_person_confidence": 0.5,
+    "embedder": "auto"
+  },
+  "video": {
+    "path": "media/surprise.mp4",
+    "fullscreen": true
+  },
+  "enrollment": {
+    "photos_dir": "enroll_photos",
+    "embeddings_path": "data/embeddings.npz"
+  }
+}

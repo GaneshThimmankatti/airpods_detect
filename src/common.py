@@ -12,8 +12,13 @@ CONFIG_PATH = ROOT / "config.json"
 
 
 def load_config() -> dict:
-    with CONFIG_PATH.open() as fh:
-        return json.load(fh)
+    if not CONFIG_PATH.exists():
+        die(f"config not found at {CONFIG_PATH}")
+    try:
+        with CONFIG_PATH.open() as fh:
+            return json.load(fh)
+    except json.JSONDecodeError as exc:
+        die(f"config.json is not valid JSON: {exc}")
 
 
 def resolve(path_str: str) -> Path:

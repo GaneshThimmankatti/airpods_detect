@@ -123,6 +123,11 @@ def main() -> int:
         for j in range(i + 1, len(matrix))
     ]
     log("enroll", f"saved {len(vectors)} embeddings -> {out_path}")
+    if len(vectors) < 5:
+        print()
+        print(f"  NOTE: only {len(vectors)} usable photo(s); README recommends 5-15")
+        print("  for a threshold that generalizes. Consider adding more variety")
+        print("  (lighting, angle, expression) and re-running enroll.")
     print()
     print("  Spread within the enrolled photos (same person, so these are 'match' distances):")
     print(f"    min {min(dists):.3f}   median {float(np.median(dists)):.3f}   max {max(dists):.3f}")

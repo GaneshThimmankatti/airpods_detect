@@ -127,7 +127,7 @@ All in [config.json](config.json):
 
 | Key | Default | Meaning |
 |---|---|---|
-| `bluetooth.device_name_contains` | `AirPods Pro` | Case- and apostrophe-insensitive substring. Matches your `Ganesh's AirPods Pro - Find My`. |
+| `bluetooth.device_name_contains` | `Shreya's AirPods Pro` | Case- and apostrophe-insensitive substring match against the paired device name. |
 | `bluetooth.poll_seconds` | `3` | Poll interval |
 | `bluetooth.stop_detector_on_disconnect` | `true` | Kill the detector when the AirPods drop |
 | `detector.consecutive_frames` | `10` | Matching frames needed to fire |

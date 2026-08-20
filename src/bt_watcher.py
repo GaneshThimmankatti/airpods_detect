@@ -84,11 +84,17 @@ def is_connected(needle: str) -> bool:
     return _connected_via_profiler(needle)
 
 
-def spawn_detector(extra: list[str]) -> subprocess.Popen:
+def spawn_detector(extra: list[str]) -> subprocess.Popen | None:
     cmd = [str(PYTHON), str(DETECTOR), *extra]
     log("bt", f"launching detector: {' '.join(cmd)}")
-    # New process group so the whole detector tree can be signalled at once.
-    return subprocess.Popen(cmd, cwd=str(ROOT), start_new_session=True)
+    try:
+        # New process group so the whole detector tree can be signalled at once.
+        return subprocess.Popen(cmd, cwd=str(ROOT), start_new_session=True)
+    except OSError as exc:
+        # A crash here would otherwise take the whole watcher down with it --
+        # the one process meant to keep running for the rest of the day.
+        log("bt", f"failed to launch detector: {exc}")
+        return None
 
 
 def stop_detector(proc: subprocess.Popen) -> None:

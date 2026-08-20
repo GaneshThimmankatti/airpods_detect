@@ -139,12 +139,17 @@ def main() -> int:
     ap.add_argument("--video", default=cfg["video"]["path"])
     ap.add_argument("--no-window", action="store_true")
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--preview", action="store_true",
+                    help="show person/face boxes only, no recognition -- "
+                         "works before anyone is enrolled")
+    ap.add_argument("--seconds", type=float, default=None,
+                    help="auto-quit after this many seconds (for scripted runs)")
     args = ap.parse_args()
 
     if args.selftest:
         return selftest(args.camera)
 
-    recognizer = Recognizer(cfg, args.embedder)
+    recognizer = None if args.preview else Recognizer(cfg, args.embedder)
     analyzer = FrameAnalyzer(min_person_confidence=d["min_person_confidence"])
     video_path = resolve(args.video)
     show = d["show_window"] and not args.no_window
@@ -157,11 +162,18 @@ def main() -> int:
 
     streak = 0
     last_trigger = 0.0
-    window = "Birthday Surprise"
-    log("detect", f"running; need {args.consec} consecutive matching frames.")
+    start = time.monotonic()
+    window = "Birthday Surprise" + (" (preview)" if args.preview else "")
+    if args.preview:
+        log("detect", "preview mode: person/face boxes only, no recognition.")
+    else:
+        log("detect", f"running; need {args.consec} consecutive matching frames.")
 
     try:
         while True:
+            if args.seconds is not None and (time.monotonic() - start) > args.seconds:
+                log("detect", f"--seconds elapsed, stopping.")
+                break
             ok, frame = cap.read()
             if not ok:
                 log("detect", "camera read failed; stopping.")
@@ -171,6 +183,20 @@ def main() -> int:
 
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             people, faces = analyzer.analyze(rgb)
+
+            if args.preview:
+                for pbox, conf in people:
+                    draw_box(frame, pbox, PLAIN_COLOR, f"Person {conf:.2f}")
+                for fbox, conf in faces:
+                    draw_box(frame, fbox, ALERT_COLOR, f"Face {conf:.2f}")
+                if show:
+                    cv2.putText(frame, f"people={len(people)} faces={len(faces)}",
+                                (12, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                                ALERT_COLOR, 2, cv2.LINE_AA)
+                    cv2.imshow(window, frame)
+                    if cv2.waitKey(1) & 0xFF in (ord("q"), 27):
+                        break
+                continue
 
             # Score every face once, then attach results to person boxes.
             scored = []

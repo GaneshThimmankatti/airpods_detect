@@ -101,8 +101,12 @@ still counts on its own — Vision often drops the body box when someone leans
 close to the camera, which is exactly when you least want a miss.
 
 Any frame with at least one match increments the streak; any frame without one
-resets it to zero. At `consecutive_frames` (10) the video plays, the streak
-resets, and `cooldown_seconds` (60) blocks re-triggering.
+resets it to zero. At `consecutive_frames` (10) the match is "confirmed" and
+the streak resets, but the video doesn't play yet -- the live camera feed
+keeps running with boxes on screen for `pre_trigger_pause_seconds` (10), then
+the video plays and `cooldown_seconds` (60) blocks re-triggering. Once
+confirmed, playback is committed to; losing the match during the pause
+doesn't cancel it.
 
 ## Recognition backends
 
@@ -131,7 +135,8 @@ All in [config.json](config.json):
 | `bluetooth.device_name_contains` | `Shreya's Airpods` | Fallback name substring, used only if `device_address` is unset. |
 | `bluetooth.poll_seconds` | `3` | Poll interval |
 | `bluetooth.stop_detector_on_disconnect` | `true` | Kill the detector when the AirPods drop |
-| `detector.consecutive_frames` | `10` | Matching frames needed to fire |
+| `detector.consecutive_frames` | `10` | Matching frames needed to confirm |
+| `detector.pre_trigger_pause_seconds` | `10` | Live feed keeps running this long after confirming, before the video plays |
 | `detector.match_threshold` | `null` | Distance cutoff; `null` = backend default |
 | `detector.cooldown_seconds` | `60` | Silence after a trigger |
 | `detector.mirror` | `true` | Flip the preview like a mirror |

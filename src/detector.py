@@ -10,8 +10,11 @@ Per frame:
   3. A person box is labelled "Birthday girl" when a matching face sits inside
      it; otherwise it stays a plain "Person" box.
   4. Frames with at least one match increment a counter; any frame without one
-     resets it to zero. At `consecutive_frames` in a row, the video plays and a
-     cooldown starts.
+     resets it to zero. At `consecutive_frames` in a row, recognition is
+     "confirmed" -- the camera feed keeps running with boxes on screen for
+     `pre_trigger_pause_seconds` (a beat of suspense), then the video plays
+     and a cooldown starts. Once confirmed, playback is committed to; losing
+     the match during the pause doesn't cancel it.
 
 Press q or Esc to quit the window.
 """
@@ -134,6 +137,10 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Webcam birthday-girl detector.")
     ap.add_argument("--camera", type=int, default=d["camera_index"])
     ap.add_argument("--consec", type=int, default=d["consecutive_frames"])
+    ap.add_argument("--pause", type=float,
+                    default=d.get("pre_trigger_pause_seconds", 0),
+                    help="seconds to keep showing the live feed after a "
+                         "confirmed match before the video plays")
     ap.add_argument("--cooldown", type=float, default=d["cooldown_seconds"])
     ap.add_argument("--embedder", default=d["embedder"])
     ap.add_argument("--video", default=cfg["video"]["path"])
@@ -162,6 +169,7 @@ def main() -> int:
 
     streak = 0
     last_trigger = 0.0
+    play_at = None  # monotonic deadline once a match is confirmed, else None
     start = time.monotonic()
     window = "Birthday Surprise" + (" (preview)" if args.preview else "")
     if args.preview:
@@ -243,16 +251,31 @@ def main() -> int:
             streak = streak + 1 if matched_frame else 0
 
             now = time.monotonic()
-            if streak >= args.consec and (now - last_trigger) > args.cooldown:
-                last_trigger = now
+            if (
+                play_at is None
+                and streak >= args.consec
+                and (now - last_trigger) > args.cooldown
+            ):
                 streak = 0
+                if args.pause > 0:
+                    play_at = now + args.pause
+                    log("trigger", f"confirmed -- playing in {args.pause:.0f}s")
+                else:
+                    play_at = now  # fire on the next check below, no delay
+
+            if play_at is not None and now >= play_at:
+                last_trigger = now
+                play_at = None
                 play_video(video_path, cfg["video"]["fullscreen"])
 
             if show:
-                hud = f"streak {streak}/{args.consec}"
-                cool = args.cooldown - (time.monotonic() - last_trigger)
-                if last_trigger and cool > 0:
-                    hud += f"   cooldown {cool:.0f}s"
+                if play_at is not None:
+                    hud = f"confirmed -- playing in {play_at - now:.0f}s"
+                else:
+                    hud = f"streak {streak}/{args.consec}"
+                    cool = args.cooldown - (now - last_trigger)
+                    if last_trigger and cool > 0:
+                        hud += f"   cooldown {cool:.0f}s"
                 cv2.putText(frame, hud, (12, 28), cv2.FONT_HERSHEY_SIMPLEX,
                             0.7, ALERT_COLOR, 2, cv2.LINE_AA)
                 cv2.imshow(window, frame)

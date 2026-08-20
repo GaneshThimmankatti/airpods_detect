@@ -30,8 +30,12 @@ if ! command -v uv >/dev/null 2>&1; then
   fi
 fi
 
-echo "==> creating virtualenv"
-uv venv --python 3.12 "$ROOT/.venv"
+if [[ -x "$ROOT/.venv/bin/python" ]]; then
+  echo "==> virtualenv already exists, reusing it"
+else
+  echo "==> creating virtualenv"
+  uv venv --python 3.12 "$ROOT/.venv"
+fi
 
 echo "==> installing core dependencies"
 uv pip install --python "$ROOT/.venv/bin/python" -r "$ROOT/requirements.txt"
@@ -56,9 +60,10 @@ if [[ "$WITH_AGENT" == 1 ]]; then
 fi
 
 echo
-echo "Done. Next:"
-echo "  1. Put 5-15 photos of the birthday girl in $ROOT/enroll_photos/"
-echo "  2. Put the surprise video at $ROOT/media/surprise.mp4"
-echo "  3. ./run.sh detect --selftest     # grants Camera permission"
-echo "  4. ./run.sh enroll"
-echo "  5. ./run.sh detect                # try it live"
+echo "Done."
+if [[ "$WITH_AGENT" == 1 ]]; then
+  echo "The watcher is running at login. Check status any time with:"
+  echo "  ./run.sh status"
+else
+  echo "Next: ./install.sh --launchagent   # start the watcher at login"
+fi

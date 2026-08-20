@@ -1,4 +1,6 @@
-numpy>=1.26
+# Capped below 2.x: torch 2.2.2 (see requirements-facenet.txt) was built
+# against numpy's 1.x ABI and crashes under 2.x ("Numpy is not available").
+numpy>=1.26,<2
 opencv-python>=4.9
 pyobjc-framework-Cocoa>=10.1
 pyobjc-framework-Quartz>=10.1

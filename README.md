@@ -127,7 +127,8 @@ All in [config.json](config.json):
 
 | Key | Default | Meaning |
 |---|---|---|
-| `bluetooth.device_name_contains` | `Shreya's AirPods Pro` | Case- and apostrophe-insensitive substring match against the paired device name. |
+| `bluetooth.device_address` | `38:c4:3a:64:1f:02` | MAC address of her AirPods (preferred match — see below). |
+| `bluetooth.device_name_contains` | `Shreya's Airpods` | Fallback name substring, used only if `device_address` is unset. |
 | `bluetooth.poll_seconds` | `3` | Poll interval |
 | `bluetooth.stop_detector_on_disconnect` | `true` | Kill the detector when the AirPods drop |
 | `detector.consecutive_frames` | `10` | Matching frames needed to fire |
@@ -135,6 +136,18 @@ All in [config.json](config.json):
 | `detector.cooldown_seconds` | `60` | Silence after a trigger |
 | `detector.mirror` | `true` | Flip the preview like a mirror |
 | `detector.min_person_confidence` | `0.5` | Vision person-box cutoff |
+
+**AirPods name keeps changing / two people's AirPods both match**: match by
+`device_address` instead of name. AirPods' display name on macOS can drift
+back to the generic "AirPods Pro - Find My" independent of any custom name
+set on the phone, and a name substring can't tell two similar AirPods apart.
+Find the address with:
+```bash
+system_profiler SPBluetoothDataType | grep -B2 "Address:"
+```
+Set it in `config.json` as `bluetooth.device_address` (colon or dash
+separated, case-insensitive) — it takes priority over `device_name_contains`
+whenever both are set.
 
 **Too many false positives** (strangers labelled): lower `match_threshold`.
 **She isn't recognized**: raise it, and add more varied enrollment photos.

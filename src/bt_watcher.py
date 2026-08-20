@@ -9,6 +9,14 @@ call.
 Only the disconnected -> connected *transition* launches the detector, so
 holding a connection does not spawn repeatedly. The child pid is tracked, and
 on disconnect it is terminated if `stop_detector_on_disconnect` is set.
+
+Matching a specific pair by name turned out to be unreliable in practice: the
+AirPods' display name flips between a custom name and the generic "AirPods
+Pro - Find My" depending on Find My sync timing, and a plain "airpods pro"
+substring can't tell two people's AirPods apart anyway. The MAC address is
+fixed regardless of what name macOS happens to be showing, so
+`bluetooth.device_address` takes priority when set; `device_name_contains`
+is kept as a fallback for setups where the address isn't known yet.
 """
 
 from __future__ import annotations
@@ -25,7 +33,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from common import ROOT, load_config, log  # noqa: E402
+from common import ROOT, die, load_config, log  # noqa: E402
 
 PYTHON = ROOT / ".venv" / "bin" / "python"
 DETECTOR = ROOT / "src" / "detector.py"
@@ -37,7 +45,33 @@ def normalize(s: str) -> str:
     return s.replace("’", "'").replace("‘", "'").lower()
 
 
-def _connected_via_iobluetooth(needle: str) -> bool | None:
+def normalize_address(s: str) -> str:
+    """'38-C4:3a-64-1F-02' -> '38c43a641f02' -- separator/case-insensitive."""
+    return s.lower().replace(":", "").replace("-", "")
+
+
+class Matcher:
+    """Identifies one specific device, by address (preferred) or name substring."""
+
+    def __init__(self, address: str | None, name_contains: str | None):
+        self.address = normalize_address(address) if address else None
+        self.name_needle = normalize(name_contains) if name_contains else None
+        if not self.address and not self.name_needle:
+            raise ValueError("need either device_address or device_name_contains")
+
+    def matches_name(self, name: str) -> bool:
+        return bool(self.name_needle) and self.name_needle in normalize(name)
+
+    def matches_address(self, address: str) -> bool:
+        return bool(self.address) and self.address == normalize_address(address)
+
+    def describe(self) -> str:
+        if self.address:
+            return f"address {self.address}"
+        return f"name containing '{self.name_needle}'"
+
+
+def _connected_via_iobluetooth(matcher: Matcher) -> bool | None:
     try:
         import IOBluetooth
     except Exception:
@@ -50,15 +84,23 @@ def _connected_via_iobluetooth(needle: str) -> bool | None:
         return None
     for dev in devices:
         try:
+            addr = dev.getAddressString()
+        except Exception:
+            addr = None
+        try:
             name = dev.nameOrAddress()
         except Exception:
-            continue
-        if name and needle in normalize(str(name)) and bool(dev.isConnected()):
+            name = None
+
+        hit = (addr and matcher.matches_address(str(addr))) or (
+            name and matcher.matches_name(str(name))
+        )
+        if hit and bool(dev.isConnected()):
             return True
     return False
 
 
-def _connected_via_profiler(needle: str) -> bool:
+def _connected_via_profiler(matcher: Matcher) -> bool:
     try:
         out = subprocess.run(
             ["system_profiler", "SPBluetoothDataType", "-json"],
@@ -71,17 +113,18 @@ def _connected_via_profiler(needle: str) -> bool:
 
     for controller in data.get("SPBluetoothDataType", []):
         for entry in controller.get("device_connected", []) or []:
-            for name in entry:
-                if needle in normalize(name):
+            for name, info in entry.items():
+                addr = (info or {}).get("device_address", "")
+                if matcher.matches_address(addr) or matcher.matches_name(name):
                     return True
     return False
 
 
-def is_connected(needle: str) -> bool:
-    via_framework = _connected_via_iobluetooth(needle)
+def is_connected(matcher: Matcher) -> bool:
+    via_framework = _connected_via_iobluetooth(matcher)
     if via_framework is not None:
         return via_framework
-    return _connected_via_profiler(needle)
+    return _connected_via_profiler(matcher)
 
 
 def spawn_detector(extra: list[str]) -> subprocess.Popen | None:
@@ -116,7 +159,10 @@ def main() -> int:
     cfg = load_config()
     bt = cfg["bluetooth"]
     ap = argparse.ArgumentParser(description="AirPods connection watcher.")
-    ap.add_argument("--device", default=bt["device_name_contains"])
+    ap.add_argument("--address", default=bt.get("device_address"),
+                    help="match by MAC address, e.g. 38:c4:3a:64:1f:02 (preferred)")
+    ap.add_argument("--device", default=bt.get("device_name_contains"),
+                    help="fall back to a name substring if --address is unset")
     ap.add_argument("--interval", type=float, default=bt["poll_seconds"])
     ap.add_argument("--once", action="store_true",
                     help="print current connection state and exit")
@@ -124,24 +170,28 @@ def main() -> int:
                     help="extra args forwarded to detector.py")
     args = ap.parse_args()
 
-    needle = normalize(args.device)
+    try:
+        matcher = Matcher(args.address, args.device)
+    except ValueError:
+        die("config.json needs bluetooth.device_address or "
+            "bluetooth.device_name_contains set")
 
     if args.once:
-        print("connected" if is_connected(needle) else "not connected")
+        print("connected" if is_connected(matcher) else "not connected")
         return 0
 
-    log("bt", f"watching for a device matching '{args.device}' "
+    log("bt", f"watching for a device matching {matcher.describe()} "
               f"every {args.interval}s")
 
     proc: subprocess.Popen | None = None
-    was_connected = is_connected(needle)
+    was_connected = is_connected(matcher)
     if was_connected:
         log("bt", "device already connected at startup; waiting for a "
                   "fresh connect before launching.")
 
     while True:
         time.sleep(args.interval)
-        now_connected = is_connected(needle)
+        now_connected = is_connected(matcher)
 
         if now_connected and not was_connected:
             log("bt", "connected")

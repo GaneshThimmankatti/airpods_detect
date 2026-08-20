@@ -1,6 +1,7 @@
 {
   "bluetooth": {
-    "device_name_contains": "Shreya's AirPods Pro",
+    "device_address": "38:c4:3a:64:1f:02",
+    "device_name_contains": "Shreya's Airpods",
     "poll_seconds": 3,
     "stop_detector_on_disconnect": true
   },

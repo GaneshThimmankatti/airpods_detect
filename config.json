@@ -8,7 +8,7 @@
   "detector": {
     "camera_index": 0,
     "consecutive_frames": 10,
-    "match_threshold": null,
+    "match_threshold": 1.15,
     "cooldown_seconds": 60,
     "show_window": true,
     "mirror": true,
